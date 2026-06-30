@@ -8,6 +8,7 @@ app = FastAPI(title="BookReviews")
 
 app.include_router(books.router)
 app.include_router(reviews.router)
+app.include_router(reviews.review_router)
 
 
 @app.get("/health")

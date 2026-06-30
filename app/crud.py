@@ -82,3 +82,22 @@ def create_review(
     db.commit()
     db.refresh(review)
     return review
+
+
+def get_review(db: Session, review_id: int) -> models.Review | None:
+    return db.get(models.Review, review_id)
+
+
+def update_review(
+    db: Session, review: models.Review, data: schemas.ReviewUpdate
+) -> models.Review:
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(review, field, value)
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+def delete_review(db: Session, review: models.Review) -> None:
+    db.delete(review)
+    db.commit()

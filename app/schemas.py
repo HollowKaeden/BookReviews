@@ -17,6 +17,13 @@ class ReviewCreate(ReviewBase):
     pass
 
 
+class ReviewUpdate(BaseModel):
+    """Частичное обновление отзыва (PATCH) — оба поля опциональны."""
+
+    rating: int | None = Field(default=None, ge=1, le=5)
+    text: str | None = Field(default=None, min_length=1)
+
+
 class ReviewRead(ReviewBase):
     model_config = ConfigDict(from_attributes=True)
 

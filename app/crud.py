@@ -62,6 +62,15 @@ def delete_book(db: Session, book: models.Book) -> None:
     db.commit()
 
 
+def set_book_cover(
+    db: Session, book: models.Book, filename: str | None
+) -> models.Book:
+    book.cover_filename = filename
+    db.commit()
+    db.refresh(book)
+    return book
+
+
 # ---------- Review ----------
 
 

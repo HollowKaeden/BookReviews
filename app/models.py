@@ -56,6 +56,9 @@ class Book(TimestampMixin, Base):
         server_default=BookStatus.want_to_read.value,
     )
     date_read: Mapped[date | None]
+    # Имя файла обложки на диске (uuid+ext). Сам файл — в upload_dir,
+    # раздаётся через /media. В БД бинарь не храним.
+    cover_filename: Mapped[str | None] = mapped_column(String(255))
 
     reviews: Mapped[list["Review"]] = relationship(
         back_populates="book",

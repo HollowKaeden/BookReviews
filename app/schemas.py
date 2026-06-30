@@ -1,5 +1,11 @@
 from datetime import date, datetime
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    model_validator,
+)
 from app.models import BookStatus
 
 
@@ -70,6 +76,15 @@ class BookRead(BookBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    # Сырое имя файла читаем из ORM, но наружу не отдаём — только cover_url.
+    cover_filename: str | None = Field(default=None, exclude=True)
+
+    @computed_field
+    @property
+    def cover_url(self) -> str | None:
+        if not self.cover_filename:
+            return None
+        return f"/media/{self.cover_filename}"
 
 
 class BookDetail(BookRead):

@@ -14,6 +14,9 @@ env/
 # Environment / secrets
 .env
 
+# Загруженные пользователем обложки
+uploads/
+
 # Test / coverage
 .pytest_cache/
 .coverage

@@ -1,6 +1,5 @@
 import enum
 from datetime import date, datetime
-
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
@@ -11,7 +10,6 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from app.database import Base
 
 

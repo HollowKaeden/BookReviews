@@ -2,11 +2,12 @@ from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.routers import books
+from app.routers import books, reviews
 
 app = FastAPI(title="BookReviews")
 
 app.include_router(books.router)
+app.include_router(reviews.router)
 
 
 @app.get("/health")

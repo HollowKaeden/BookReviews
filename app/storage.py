@@ -12,6 +12,42 @@ ALLOWED_IMAGE_TYPES = {
 }
 
 
+class CoverError(Exception):
+    """Базовая ошибка загрузки обложки (валидация входного файла)."""
+
+
+class UnsupportedImageType(CoverError):
+    """Тип файла не из белого списка."""
+
+
+class FileTooLarge(CoverError):
+    """Файл превышает лимит размера."""
+
+
+def validate_cover(data: bytes, content_type: str | None) -> None:
+    """Проверяет тип и размер обложки. Бросает CoverError при проблеме.
+
+    Отдельно от сохранения — чтобы можно было проверить файл ещё до
+    записи на диск (например, при создании книги вместе с обложкой).
+    """
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise UnsupportedImageType(
+            "Поддерживаются только изображения: jpeg, png, webp, gif"
+        )
+    if len(data) > settings.max_upload_bytes:
+        mb = settings.max_upload_bytes // (1024 * 1024)
+        raise FileTooLarge(f"Файл слишком большой (максимум {mb} МБ)")
+
+
+def validate_and_save_cover(data: bytes, content_type: str | None) -> str:
+    """Проверяет и сохраняет файл, возвращает имя.
+
+    Единая точка для JSON-ручки и HTML-формы.
+    """
+    validate_cover(data, content_type)
+    return save_cover(data, content_type)
+
+
 def save_cover(data: bytes, content_type: str) -> str:
     """Сохраняет обложку под случайным именем, возвращает имя файла.
 

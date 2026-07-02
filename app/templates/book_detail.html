@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }}{% endblock %}
+
+{% block content %}
+<p><a href="/">← ко всем книгам</a></p>
+
+<section class="book-detail card">
+    <div class="cover-col">
+        {% if book.cover_filename %}
+        <img class="cover" src="/media/{{ book.cover_filename }}"
+             alt="Обложка «{{ book.title }}»">
+        {% else %}
+        <div class="cover-placeholder">Без обложки</div>
+        {% endif %}
+    </div>
+
+    <div class="meta">
+        <h1>{{ book.title }}</h1>
+        <p class="muted">
+            {{ book.author }}{% if book.year %}, {{ book.year }}{% endif %}
+        </p>
+        <span class="badge {{ book.status.value }}">
+            {{ STATUS_LABELS[book.status.value] }}</span>
+        {% if book.date_read %}
+        <p>Прочитано: {{ book.date_read.strftime("%d.%m.%Y") }}</p>
+        {% endif %}
+        {% if book.tags %}
+        <div class="tags">
+            {% for tag in book.tags %}
+            <a class="tag" href="/?tag={{ tag.name|urlencode }}">{{ tag.name }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card">
+    {% if reviews|length == 0 %}
+    <p class="muted">Отзыва на книгу пока нет.</p>
+
+    {% elif reviews|length == 1 %}
+    {% set review = reviews[0] %}
+    <h2>Отзыв</h2>
+    <div class="review">
+        <div class="review-body">
+            <div class="stars" aria-label="Оценка {{ review.rating }} из 5">
+                {{ "%.10g" % review.rating }} ★
+            </div>
+            <p>{{ review.text }}</p>
+            <small class="muted">{{ review.created_at.strftime("%d.%m.%Y") }}</small>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="review-header">
+        <h2>Отзывы</h2>
+        <div class="review-tabs">
+            {% for review in reviews %}
+            <button type="button"
+                    class="review-tab{% if loop.first %} active{% endif %}"
+                    data-idx="{{ loop.index0 }}">
+                {{ review.created_at.strftime("%d.%m.%Y") }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="review-carousel">
+        {% for review in reviews %}
+        <div class="review" {% if loop.index0 > 0 %}style="display:none"{% endif %}>
+            <div class="review-body">
+                <div class="stars" aria-label="Оценка {{ review.rating }} из 5">
+                    {{ "%.10g" % review.rating }} ★
+                </div>
+                <p>{{ review.text }}</p>
+                <small class="muted">{{ review.created_at.strftime("%d.%m.%Y %H:%M") }}</small>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <script>
+    (function () {
+        const slides = document.querySelectorAll('.review-carousel .review');
+        const tabs = document.querySelectorAll('.review-tab');
+        let current = 0;
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const idx = parseInt(tab.dataset.idx, 10);
+                slides[current].style.display = 'none';
+                tabs[current].classList.remove('active');
+                current = idx;
+                slides[current].style.display = '';
+                tabs[current].classList.add('active');
+            });
+        });
+    })();
+    </script>
+    {% endif %}
+</section>
+{% endblock %}

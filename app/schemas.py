@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Annotated
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -10,12 +11,24 @@ from app.models import BookStatus
 
 
 MAX_BOOK_YEAR = 2100
+MAX_TAG_LEN = 50
+
+TagName = Annotated[str, Field(min_length=1, max_length=MAX_TAG_LEN)]
+
+
+# ---------- Tag ----------
+
+class TagRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
 
 
 # ---------- Review ----------
 
 class ReviewBase(BaseModel):
-    rating: int = Field(ge=1, le=5)
+    rating: float = Field(ge=0, le=5)
     text: str = Field(min_length=1)
 
 
@@ -26,7 +39,7 @@ class ReviewCreate(ReviewBase):
 class ReviewUpdate(BaseModel):
     """Частичное обновление отзыва (PATCH) — оба поля опциональны."""
 
-    rating: int | None = Field(default=None, ge=1, le=5)
+    rating: float | None = Field(default=None, ge=0, le=5)
     text: str | None = Field(default=None, min_length=1)
 
 
@@ -50,6 +63,8 @@ class BookBase(BaseModel):
 
 
 class BookCreate(BookBase):
+    tags: list[TagName] = []
+
     @model_validator(mode="after")
     def date_read_only_when_read(self) -> "BookCreate":
         # Дублируем инвариант БД, чтобы клиент получил 422, а не 500.
@@ -68,6 +83,8 @@ class BookUpdate(BaseModel):
     year: int | None = Field(default=None, ge=1, le=MAX_BOOK_YEAR)
     status: BookStatus | None = None
     date_read: date | None = None
+    # None = теги не трогаем; [] = очистить все теги; список = заменить набор.
+    tags: list[TagName] | None = None
 
 
 class BookRead(BookBase):
@@ -76,6 +93,7 @@ class BookRead(BookBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    tags: list[TagRead] = []
     # Сырое имя файла читаем из ORM, но наружу не отдаём — только cover_url.
     cover_filename: str | None = Field(default=None, exclude=True)
 

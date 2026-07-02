@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tag_editor %}
+{% block title %}Управление — {{ book.title }}{% endblock %}
+
+{% block content %}
+<p>
+    <a href="/admin">← к управлению</a> ·
+    <a href="/books/{{ book.id }}">смотреть как читатель</a>
+</p>
+
+<section class="book-detail card">
+    <div class="cover-col">
+        {% if book.cover_filename %}
+        <img class="cover" src="/media/{{ book.cover_filename }}"
+             alt="Обложка «{{ book.title }}»">
+        {% else %}
+        <div class="cover-placeholder">Без обложки</div>
+        {% endif %}
+
+        <form class="stack cover-form"
+              action="/admin/books/{{ book.id }}/cover"
+              method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept="image/*" required>
+            <button type="submit" class="secondary">
+                {{ 'Заменить' if book.cover_filename else 'Загрузить' }} обложку
+            </button>
+        </form>
+        {% if book.cover_filename %}
+        <form action="/admin/books/{{ book.id }}/cover/delete" method="post">
+            <button type="submit" class="link-danger">Удалить обложку</button>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="meta" id="book-edit">
+        <h2>Редактировать книгу</h2>
+        <form class="stack" action="/admin/books/{{ book.id }}/edit"
+              method="post">
+            <div class="row">
+                <div>
+                    <label>Название</label>
+                    <input name="title" required maxlength="255"
+                           value="{{ book.title }}">
+                </div>
+                <div>
+                    <label>Автор</label>
+                    <input name="author" required maxlength="255"
+                           value="{{ book.author }}">
+                </div>
+            </div>
+            <div class="row">
+                <div>
+                    <label>Год</label>
+                    <input name="year" type="number" min="1" max="2100"
+                           value="{{ book.year if book.year is not none else '' }}">
+                </div>
+                <div>
+                    <label>Статус</label>
+                    <select name="status">
+                        {% for value, label in STATUS_LABELS.items() %}
+                        <option value="{{ value }}"
+                            {{ 'selected' if value == book.status.value }}>
+                            {{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label>Дата прочтения</label>
+                    <input name="date_read" type="date"
+                       value="{{ book.date_read.isoformat() if book.date_read else '' }}">
+                </div>
+            </div>
+            {{ tag_editor(book.tags|map(attribute='name')|list, all_tags) }}
+            <p class="hint">Дата прочтения — только при статусе «Прочитано».</p>
+            <div><button type="submit" data-save="book">Сохранить</button></div>
+        </form>
+
+        <form class="delete-book"
+              action="/admin/books/{{ book.id }}/delete" method="post"
+              onsubmit="return confirm('Удалить книгу вместе со всеми отзывами?')">
+            <button type="submit" class="link-danger">Удалить книгу</button>
+        </form>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Отзывы ({{ reviews|length }})</h2>
+    {% for review in reviews %}
+    <div class="review review-edit" id="review-{{ review.id }}">
+        <form class="stack" action="/admin/reviews/{{ review.id }}/edit"
+              method="post">
+            <div class="row">
+                <div class="rating-field">
+                    <label>Оценка (0–5)</label>
+                    <input name="rating" type="number"
+                           min="0" max="5" step="0.1" required
+                           value="{{ "%.10g" % review.rating }}">
+                </div>
+            </div>
+            <div>
+                <label>Текст</label>
+                <textarea name="text" rows="2" required>{{ review.text }}</textarea>
+            </div>
+            <div class="review-actions">
+                <button type="submit" class="secondary"
+                        data-save="review" data-review-id="{{ review.id }}">
+                    Сохранить</button>
+                <small class="muted">
+                    {{ review.created_at.strftime("%d.%m.%Y %H:%M") }}</small>
+            </div>
+        </form>
+        <form action="/admin/reviews/{{ review.id }}/delete" method="post">
+            <button type="submit" class="link-danger">Удалить отзыв</button>
+        </form>
+    </div>
+    {% else %}
+    <p class="muted">Отзыва на книгу пока нет.</p>
+    {% endfor %}
+</section>
+
+<section class="card">
+    <h2>Добавить отзыв</h2>
+    <form class="stack" action="/admin/books/{{ book.id }}/reviews"
+          method="post">
+        <div class="row">
+            <div class="rating-field">
+                <label>Оценка (0–5)</label>
+                <input name="rating" type="number"
+                       min="0" max="5" step="0.1" required>
+            </div>
+        </div>
+        <div>
+            <label>Текст</label>
+            <textarea name="text" rows="3" required></textarea>
+        </div>
+        <div><button type="submit">Добавить отзыв</button></div>
+    </form>
+</section>
+{% endblock %}

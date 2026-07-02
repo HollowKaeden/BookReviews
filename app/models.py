@@ -2,15 +2,35 @@ import enum
 from datetime import date, datetime
 from sqlalchemy import (
     CheckConstraint,
+    Column,
     DateTime,
     Enum,
     ForeignKey,
     String,
+    Table,
     Text,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+
+
+# Связь книга-тег many-to-many. Составной PK (book_id, tag_id) сам гарантирует
+# уникальность пары. ondelete=CASCADE (удаление книги или тега подчищает связи).
+book_tags = Table(
+    "book_tags",
+    Base.metadata,
+    Column(
+        "book_id",
+        ForeignKey("books.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "tag_id",
+        ForeignKey("tags.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class BookStatus(enum.StrEnum):
@@ -65,16 +85,37 @@ class Book(TimestampMixin, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    # order_by по имени, теги всегда рендерятся в стабильном алфавитном порядке.
+    tags: Mapped[list["Tag"]] = relationship(
+        secondary=book_tags,
+        back_populates="books",
+        order_by="Tag.name",
+    )
 
     def __repr__(self) -> str:
         return f"<Book {self.id}: {self.title!r}>"
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+
+    books: Mapped[list["Book"]] = relationship(
+        secondary=book_tags,
+        back_populates="tags",
+    )
+
+    def __repr__(self) -> str:
+        return f"<Tag {self.id}: {self.name!r}>"
 
 
 class Review(TimestampMixin, Base):
     __tablename__ = "reviews"
     __table_args__ = (
         CheckConstraint(
-            "rating >= 1 AND rating <= 5", name="ck_reviews_rating_range"
+            "rating >= 0 AND rating <= 5", name="ck_reviews_rating_range"
         ),
     )
 
@@ -82,7 +123,7 @@ class Review(TimestampMixin, Base):
     book_id: Mapped[int] = mapped_column(
         ForeignKey("books.id", ondelete="CASCADE"), index=True
     )
-    rating: Mapped[int] = mapped_column()
+    rating: Mapped[float] = mapped_column()
     text: Mapped[str] = mapped_column(Text)
 
     book: Mapped["Book"] = relationship(back_populates="reviews")

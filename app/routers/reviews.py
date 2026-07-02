@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas
+from app.auth import require_admin
 from app.database import get_db
 from app.routers.books import get_book_or_404
+
+admin_only = [Depends(require_admin)]
 
 router = APIRouter(prefix="/api/books/{book_id}/reviews", tags=["reviews"])
 
@@ -32,7 +35,10 @@ def list_reviews(
 
 
 @router.post(
-    "", response_model=schemas.ReviewRead, status_code=status.HTTP_201_CREATED
+    "",
+    response_model=schemas.ReviewRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=admin_only,
 )
 def create_review(
     data: schemas.ReviewCreate,
@@ -42,7 +48,9 @@ def create_review(
     return crud.create_review(db, book.id, data)
 
 
-@review_router.patch("/{review_id}", response_model=schemas.ReviewRead)
+@review_router.patch(
+    "/{review_id}", response_model=schemas.ReviewRead, dependencies=admin_only
+)
 def update_review(
     data: schemas.ReviewUpdate,
     review: models.Review = Depends(get_review_or_404),
@@ -52,7 +60,9 @@ def update_review(
 
 
 @review_router.delete(
-    "/{review_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/{review_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=admin_only,
 )
 def delete_review(
     review: models.Review = Depends(get_review_or_404),

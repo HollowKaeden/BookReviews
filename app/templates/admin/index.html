@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tag_editor %}
+{% block title %}Управление — книги{% endblock %}
+
+{% set selected_status = form.status if form else 'want_to_read' %}
+
+{% block content %}
+<p><a href="/">← на публичный сайт</a></p>
+
+<section class="card">
+    <h2>Добавить книгу</h2>
+    <form class="stack" action="/admin/books" method="post"
+          enctype="multipart/form-data">
+        <div class="row">
+            <div>
+                <label>Название</label>
+                <input name="title" required maxlength="255"
+                       value="{{ form.title if form else '' }}">
+            </div>
+            <div>
+                <label>Автор</label>
+                <input name="author" required maxlength="255"
+                       value="{{ form.author if form else '' }}">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                <label>Год</label>
+                <input name="year" type="number" min="1" max="2100"
+                       value="{{ form.year if form else '' }}">
+            </div>
+            <div>
+                <label>Статус</label>
+                <select name="status">
+                    {% for value, label in STATUS_LABELS.items() %}
+                    <option value="{{ value }}"
+                        {{ 'selected' if value == selected_status else '' }}>
+                        {{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Дата прочтения</label>
+                <input name="date_read" type="date"
+                       value="{{ form.date_read if form else '' }}">
+            </div>
+        </div>
+        {{ tag_editor(form.tags if form else [], all_tags) }}
+        <div>
+            <label>Обложка (необязательно)</label>
+            <input type="file" name="file" accept="image/*">
+        </div>
+        <p class="hint">Дату прочтения указывай только для статуса «Прочитано».</p>
+        <div><button type="submit">Добавить</button></div>
+    </form>
+</section>
+
+<h1>Книги ({{ books|length }})</h1>
+{% if books %}
+<div class="book-grid">
+    {% for book in books %}
+    <article class="book-card">
+        <a href="/admin/books/{{ book.id }}" class="cover-link">
+            {% if book.cover_filename %}
+            <img class="cover" src="/media/{{ book.cover_filename }}"
+                 alt="Обложка «{{ book.title }}»">
+            {% else %}
+            <div class="cover-placeholder">Без обложки</div>
+            {% endif %}
+        </a>
+        <div class="body">
+            <a class="title" href="/admin/books/{{ book.id }}">
+                {{ book.title }}</a>
+            <div class="author">
+                {{ book.author }}{% if book.year %}, {{ book.year }}{% endif %}
+            </div>
+            <span class="badge {{ book.status.value }}">
+                {{ STATUS_LABELS[book.status.value] }}</span>
+            {% if book.tags %}
+            <div class="tags">
+                {% for tag in book.tags %}
+                <span class="tag">{{ tag.name }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<p class="muted">Пока ничего не добавлено — заполни форму выше.</p>
+{% endif %}
+{% endblock %}

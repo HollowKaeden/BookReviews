@@ -10,11 +10,14 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from app import crud, schemas, storage
+from app.auth import require_admin
 from app.config import settings
 from app.database import get_db
 from app.models import Book
 
 router = APIRouter(prefix="/api/books", tags=["books"])
+
+admin_only = [Depends(require_admin)]
 
 
 def get_book_or_404(book_id: int, db: Session = Depends(get_db)) -> Book:
@@ -37,7 +40,10 @@ def list_books(
 
 
 @router.post(
-    "", response_model=schemas.BookRead, status_code=status.HTTP_201_CREATED
+    "",
+    response_model=schemas.BookRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=admin_only,
 )
 def create_book(
     data: schemas.BookCreate, db: Session = Depends(get_db)
@@ -50,7 +56,9 @@ def get_book(book: Book = Depends(get_book_or_404)) -> Book:
     return book
 
 
-@router.patch("/{book_id}", response_model=schemas.BookRead)
+@router.patch(
+    "/{book_id}", response_model=schemas.BookRead, dependencies=admin_only
+)
 def update_book(
     data: schemas.BookUpdate,
     book: Book = Depends(get_book_or_404),
@@ -64,41 +72,54 @@ def update_book(
         )
 
 
-@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{book_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=admin_only,
+)
 def delete_book(
     book: Book = Depends(get_book_or_404), db: Session = Depends(get_db)
 ) -> None:
+    cover_filename = book.cover_filename
     crud.delete_book(db, book)
+    storage.delete_cover(cover_filename)  # не оставляем файл
 
 
-@router.put("/{book_id}/cover", response_model=schemas.BookRead)
+@router.put(
+    "/{book_id}/cover",
+    response_model=schemas.BookRead,
+    dependencies=admin_only,
+)
 async def set_cover(
     book: Book = Depends(get_book_or_404),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> Book:
-    if file.content_type not in storage.ALLOWED_IMAGE_TYPES:
+    data = await file.read(settings.max_upload_bytes + 1)
+    try:
+        filename = storage.validate_and_save_cover(data, file.content_type)
+    except storage.UnsupportedImageType as exc:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported image type (allowed: jpeg, png, webp, gif)",
+            detail=str(exc),
         )
-    # Читаем на 1 байт больше лимита — чтобы поймать превышение, не загружая
-    # в память гигабайты.
-    data = await file.read(settings.max_upload_bytes + 1)
-    if len(data) > settings.max_upload_bytes:
+    except storage.FileTooLarge as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="File too large",
+            detail=str(exc),
         )
 
     old_filename = book.cover_filename
-    filename = storage.save_cover(data, file.content_type)
     crud.set_book_cover(db, book, filename)
-    storage.delete_cover(old_filename)  # подчищаем старую обложку
+    storage.delete_cover(old_filename)
     return book
 
 
-@router.delete("/{book_id}/cover", response_model=schemas.BookRead)
+@router.delete(
+    "/{book_id}/cover",
+    response_model=schemas.BookRead,
+    dependencies=admin_only,
+)
 def delete_cover(
     book: Book = Depends(get_book_or_404), db: Session = Depends(get_db)
 ) -> Book:

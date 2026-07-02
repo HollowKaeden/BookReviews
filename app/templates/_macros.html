@@ -1,0 +1,32 @@
+{# Редактор тегов-чипов. tag_names — список строк (уже выбранные теги),
+   all_tags — все теги в системе для подсказок datalist.
+   Каждый чип несёт скрытый input name="tags" → на сервер уходит списком.
+   Поведение (добавить/удалить чип) навешивает static/tags.js по data-tag-editor. #}
+{% macro tag_editor(tag_names, all_tags) %}
+<div class="field">
+    <label>Теги</label>
+    <div class="tag-editor" data-tag-editor>
+        <div class="tag-editor-list">
+            {% for name in tag_names %}
+            <span class="tag-chip">
+                <span class="tag-chip-label">{{ name }}</span>
+                <input type="hidden" name="tags" value="{{ name }}">
+                <button type="button" class="tag-chip-x"
+                        aria-label="Удалить тег">×</button>
+            </span>
+            {% endfor %}
+        </div>
+        <div class="tag-editor-add">
+            <input class="tag-editor-input" type="text"
+                   list="tag-suggestions" placeholder="Например: Python"
+                   maxlength="50" autocomplete="off">
+            <button type="button" class="tag-editor-btn secondary"
+                    aria-label="Добавить тег">+</button>
+        </div>
+    </div>
+    <datalist id="tag-suggestions">
+        {% for t in all_tags %}<option value="{{ t.name }}"></option>{% endfor %}
+    </datalist>
+    <p class="hint">Введите тег и нажмите + или Enter.</p>
+</div>
+{% endmacro %}

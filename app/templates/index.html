@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Мои книги{% endblock %}
+
+{% set sort_labels = {
+    'created': 'Дате добавления',
+    'title': 'Названию',
+    'date_read': 'Дате прочтения',
+} %}
+
+{% block content %}
+<h1>Книги ({{ books|length }})</h1>
+
+<div class="toolbar">
+    {% if all_tags %}
+    <div class="tag-filter">
+        <a class="tag-pill {{ 'active' if not active_tag }}"
+           href="/?sort={{ sort }}&order={{ order }}">Все</a>
+        {% for tag in all_tags %}
+        <a class="tag-pill {{ 'active' if tag.name == active_tag }}"
+           href="/?sort={{ sort }}&order={{ order }}&tag={{ tag.name|urlencode }}">
+            {{ tag.name }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form class="sort-form" method="get" action="/" data-autosubmit>
+        {% if active_tag %}
+        <input type="hidden" name="tag" value="{{ active_tag }}">
+        {% endif %}
+        <label for="sort">Сортировать по</label>
+        <select id="sort" name="sort">
+            {% for value, label in sort_labels.items() %}
+            <option value="{{ value }}" {{ 'selected' if value == sort }}>
+                {{ label }}</option>
+            {% endfor %}
+        </select>
+        <select name="order" aria-label="Направление сортировки">
+            <option value="desc" {{ 'selected' if order != 'asc' }}>
+                ↓ по убыванию</option>
+            <option value="asc" {{ 'selected' if order == 'asc' }}>
+                ↑ по возрастанию</option>
+        </select>
+        {# Сабмит вешает JS на change; кнопка — фолбэк без JS. #}
+        <noscript><button type="submit" class="secondary">Применить</button></noscript>
+    </form>
+</div>
+
+{% if books %}
+<div class="book-grid">
+    {% for book in books %}
+    <article class="book-card">
+        <a href="/books/{{ book.id }}" class="cover-link">
+            {% if book.cover_filename %}
+            <img class="cover" src="/media/{{ book.cover_filename }}"
+                 alt="Обложка «{{ book.title }}»">
+            {% else %}
+            <div class="cover-placeholder">Без обложки</div>
+            {% endif %}
+        </a>
+        <div class="body">
+            <a class="title" href="/books/{{ book.id }}">{{ book.title }}</a>
+            <div class="author">
+                {{ book.author }}{% if book.year %}, {{ book.year }}{% endif %}
+            </div>
+            <span class="badge {{ book.status.value }}">
+                {{ STATUS_LABELS[book.status.value] }}</span>
+            {% if book.tags %}
+            <div class="tags">
+                {% for tag in book.tags %}
+                <a class="tag"
+                   href="/?sort={{ sort }}&order={{ order }}&tag={{ tag.name|urlencode }}">
+                    {{ tag.name }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<p class="muted">
+    {% if active_tag %}Книг с тегом «{{ active_tag }}» пока нет.
+    {% else %}Список пока пуст.{% endif %}
+</p>
+{% endif %}
+{% endblock %}

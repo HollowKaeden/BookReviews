@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Мои книги{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/tags.js" defer></script>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-row">
+            <a href="/" class="logo">📚 Мои книги</a>
+        </div>
+    </header>
+    <main class="container">
+        {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+        {% block content %}{% endblock %}
+    </main>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var saved = params.get('saved');
+        if (!saved) return;
+
+        var btn = null;
+        if (saved === 'book') {
+          btn = document.querySelector('button[data-save="book"]');
+        } else if (saved === 'review') {
+          var id = params.get('saved_id');
+          btn = document.querySelector(
+            'button[data-save="review"][data-review-id="' + id + '"]'
+          );
+        }
+
+        // Убираем ?saved из адреса, чтобы F5 не повторял эффект.
+        if (window.history.replaceState) {
+          var url = new URL(window.location);
+          url.searchParams.delete('saved');
+          url.searchParams.delete('saved_id');
+          window.history.replaceState({}, '', url);
+        }
+        if (!btn) return;
+
+        var original = btn.textContent;
+        btn.textContent = 'Сохранено!';
+        btn.classList.add('saved');
+        btn.disabled = true;
+        setTimeout(function () {
+          btn.textContent = original;
+          btn.classList.remove('saved');
+          btn.disabled = false;
+        }, 2000);
+      })();
+    </script>
+</body>
+</html>

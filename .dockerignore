@@ -1,0 +1,26 @@
+# Виртуальные окружения и кеши
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# VCS и CI
+.git/
+.gitignore
+.github/
+
+# Локальные секреты и загрузки в образ не тащим
+.env
+uploads/
+
+# Тесты и документация в рантайм-образе не нужны
+tests/
+*.md
+
+# Docker-обвязка (не нужна внутри образа)
+Dockerfile
+.dockerignore
+docker-compose.yml

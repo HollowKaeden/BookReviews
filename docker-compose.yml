@@ -16,5 +16,36 @@ services:
       timeout: 3s
       retries: 5
 
+  web:
+    build: .
+    depends_on:
+      db:
+        # Ждём, пока Postgres пройдёт healthcheck, иначе миграции в entrypoint
+        # упадут на connection refused.
+        condition: service_healthy
+    environment:
+      # Ходим к БД по имени сервиса внутри compose-сети (порт внутренний, 5432).
+      DATABASE_URL: postgresql+psycopg://bookreviews:bookreviews@db:5432/bookreviews
+      # Учётка владельца берётся из .env хоста (compose подставляет), с дефолтами.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "8000:8000"
+    volumes:
+      # Обложки переживают пересоздание контейнера.
+      - uploads:/app/uploads
+    healthcheck:
+      # /health не трогает БД, просто проверяем, что процесс жив и отвечает.
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request,sys;
+          sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status == 200 else 1)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 volumes:
   pgdata:
+  uploads:

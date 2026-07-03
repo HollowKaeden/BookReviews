@@ -1,10 +1,12 @@
 """Общие фикстуры для тестов.
 
-Тесты используют SQLite в памяти вместо PostgreSQL. Для API и CRUD этого
-достаточно, а гонять их можно без внешней БД, что удобно и локально, и в CI.
-Postgres-специфику проверяем на уровне миграций и docker-compose.
+По умолчанию тесты идут на SQLite в памяти: быстро и без внешней БД. Но БД
+выбирается через TEST_DATABASE_URL, поэтому тот же набор гоняется и на реальном
+PostgreSQL (в CI поднимаем сервис). Это ловит диалект-специфику, которой SQLite
+не воспроизводит, например Unicode в lower() при регистронезависимом матче тегов.
 """
 
+import os
 import tempfile
 
 import pytest
@@ -17,6 +19,9 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite+pysqlite:///:memory:")
+IS_SQLITE = TEST_DATABASE_URL.startswith("sqlite")
+
 # Обложки в тестах пишем во временный каталог. storage читает upload_dir в
 # момент вызова, так что подмена атрибута работает независимо от порядка импортов.
 settings.upload_dir = tempfile.mkdtemp(prefix="bookreviews-tests-")
@@ -27,22 +32,28 @@ ADMIN_AUTH = (settings.admin_username, settings.admin_password)
 
 @pytest.fixture
 def db_engine():
-    """Свежая in-memory БД на каждый тест, полная изоляция состояния.
+    """Чистая схема на каждый тест, полная изоляция состояния.
 
-    StaticPool держит одно соединение, так что все сессии внутри теста видят
-    одну базу. PRAGMA foreign_keys=ON обязателен: без него SQLite игнорирует
-    ondelete=CASCADE, и каскадное удаление отзывов не отработает.
+    Для SQLite: StaticPool держит одно соединение (все сессии видят одну
+    in-memory базу), а PRAGMA foreign_keys=ON обязателен, иначе SQLite
+    игнорирует ondelete=CASCADE и каскадное удаление отзывов не отработает.
+    Для Postgres пул обычный; drop_all перед create_all подчищает остатки
+    схемы от предыдущего прогона в постоянной БД.
     """
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    if IS_SQLITE:
+        engine = create_engine(
+            TEST_DATABASE_URL,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
 
-    @event.listens_for(engine, "connect")
-    def _enable_fk(dbapi_conn, _record):
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+        @event.listens_for(engine, "connect")
+        def _enable_fk(dbapi_conn, _record):
+            dbapi_conn.execute("PRAGMA foreign_keys=ON")
+    else:
+        engine = create_engine(TEST_DATABASE_URL)
 
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     try:
         yield engine

@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  # Быстрый прогон на SQLite: без внешней БД, ловит логику приложения.
+  tests:
+    runs-on: ubuntu-latest
+    env:
+      # Тесты работают на SQLite, но app.config при импорте требует эти
+      # переменные (в CI нет .env). Значения фиктивные: реальную БД не трогаем.
+      DATABASE_URL: "sqlite+pysqlite:///:memory:"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest -q
+
+  # Тот же набор тестов против реального Postgres плюс проверка миграций.
+  # Ловит диалект-специфику, которую SQLite не воспроизводит.
+  tests-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bookreviews_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      # TEST_DATABASE_URL переключает движок в conftest на Postgres.
+      # DATABASE_URL нужен app.config при импорте и alembic при миграциях.
+      TEST_DATABASE_URL: "postgresql+psycopg://postgres:postgres@localhost:5432/bookreviews_test"
+      DATABASE_URL: "postgresql+psycopg://postgres:postgres@localhost:5432/bookreviews_test"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run tests against Postgres
+        run: pytest -q
+
+      - name: Verify migrations apply on Postgres
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Проверяем, что образ собирается. Не публикуем: цель CI это ловить
+      # поломки сборки, реестр здесь не нужен.
+      - name: Build image
+        run: docker build -t bookreviews:ci .

@@ -76,11 +76,59 @@ jobs:
           alembic downgrade base
 
   docker-build:
+    # Образ публикуем только после зелёных тестов.
+    needs: [tests, tests-postgres]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Пуш в реестр и деплой только на push в main; на PR образ просто собирается.
+      PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
 
-      # Проверяем, что образ собирается. Не публикуем: цель CI это ловить
-      # поломки сборки, реестр здесь не нужен.
-      - name: Build image
-        run: docker build -t bookreviews:ci .
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        if: env.PUBLISH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/hollowkaeden/bookreviews
+          tags: |
+            type=sha,format=long,prefix=
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ env.PUBLISH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Сообщаем портфолио, что вышел новый образ: оно передеплоит сервер.
+      # Токен: fine-grained PAT с Contents: read and write только на репо portfolio.
+      - name: Trigger portfolio deploy
+        if: env.PUBLISH == 'true'
+        env:
+          TOKEN: ${{ secrets.PORTFOLIO_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::PORTFOLIO_DISPATCH_TOKEN не задан, деплой не запущен"
+            exit 0
+          fi
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/HollowKaeden/portfolio/dispatches \
+            -d '{"event_type":"deploy","client_payload":{"source":"bookreviews","sha":"${{ github.sha }}"}}'
+          echo "Деплой портфолио запущен"
